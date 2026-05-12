@@ -43,12 +43,12 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$OutputFolder,
 
-    # Optional CSV containing a SiteUrl column.
+    # Optional CSV containing a SiteUrl column. If both InputCsv and SiteUrl are omitted, the script prompts for an input CSV or site URL.
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
     [string]$InputCsv,
 
-    # Optional single SharePoint Online or OneDrive personal site URL.
+    # Optional single SharePoint Online or OneDrive personal site URL. If both InputCsv and SiteUrl are omitted, the script prompts for an input CSV or site URL.
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
     [string]$SiteUrl,
@@ -311,17 +311,33 @@ function Get-SiteUrlsFromInput {
     <#
     .SYNOPSIS
         Builds the de-duplicated site URL list from InputCsv and/or SiteUrl.
+
+    .DESCRIPTION
+        InputCsv and SiteUrl are intentionally optional parameters so the script can be
+        started interactively. When both are omitted, the script prompts for a CSV path
+        first and then prompts for one site URL if no CSV path is supplied.
     #>
     $siteUrls = New-Object System.Collections.Generic.List[string]
+    $effectiveInputCsv = $InputCsv
+    $effectiveSiteUrl = $SiteUrl
 
-    if (-not [string]::IsNullOrWhiteSpace($InputCsv)) {
-        if (-not (Test-Path -Path $InputCsv -PathType Leaf)) {
-            throw "InputCsv was specified but the file was not found: $InputCsv"
+    if ([string]::IsNullOrWhiteSpace($effectiveInputCsv) -and [string]::IsNullOrWhiteSpace($effectiveSiteUrl)) {
+        Write-Log -Message 'No -InputCsv or -SiteUrl was supplied. Prompting for target input.'
+        $effectiveInputCsv = (Read-Host -Prompt 'Enter the full path to an input CSV with a SiteUrl column, or press Enter to provide a single SiteUrl').Trim().Trim([char]34).Trim([char]39)
+
+        if ([string]::IsNullOrWhiteSpace($effectiveInputCsv)) {
+            $effectiveSiteUrl = (Read-Host -Prompt 'Enter one SharePoint Online or OneDrive SiteUrl').Trim()
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($effectiveInputCsv)) {
+        if (-not (Test-Path -Path $effectiveInputCsv -PathType Leaf)) {
+            throw "InputCsv was specified but the file was not found: $effectiveInputCsv"
         }
 
-        $rows = @(Import-Csv -Path $InputCsv)
+        $rows = @(Import-Csv -Path $effectiveInputCsv)
         if ($rows.Count -gt 0 -and $null -eq $rows[0].PSObject.Properties['SiteUrl']) {
-            throw "InputCsv must contain a column named 'SiteUrl'. File: $InputCsv"
+            throw "InputCsv must contain a column named 'SiteUrl'. File: $effectiveInputCsv"
         }
 
         foreach ($row in $rows) {
@@ -331,13 +347,13 @@ function Get-SiteUrlsFromInput {
         }
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($SiteUrl)) {
-        $siteUrls.Add($SiteUrl.Trim())
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSiteUrl)) {
+        $siteUrls.Add($effectiveSiteUrl.Trim())
     }
 
     $uniqueSiteUrls = @($siteUrls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
     if ($uniqueSiteUrls.Count -eq 0) {
-        throw "Provide at least one site URL by using -InputCsv with a SiteUrl column or -SiteUrl."
+        throw "Provide at least one site URL by using -InputCsv with a SiteUrl column, entering an input CSV when prompted, using -SiteUrl, or entering a SiteUrl when prompted."
     }
 
     return $uniqueSiteUrls
