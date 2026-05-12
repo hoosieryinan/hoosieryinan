@@ -16,7 +16,8 @@
 .NOTES
     Requirements:
       - Windows PowerShell 5.1 or PowerShell 7+
-      - Microsoft.Online.SharePoint.PowerShell module
+      - Microsoft.Online.SharePoint.PowerShell module installed in the same PowerShell host that runs this script
+        Example: Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser -AllowClobber
       - ImportExcel module for .xlsx export, optional
       - SharePoint Online permissions sufficient to read the target sites and tenant settings
 #>
@@ -94,6 +95,44 @@ function Write-Log {
         'ERROR' { Write-Error -Message $Message -ErrorAction Continue }
         'WARN'  { Write-Warning -Message $Message }
         default { Write-Host $line }
+    }
+}
+
+
+function Initialize-SPOManagementShellModule {
+    $moduleName = 'Microsoft.Online.SharePoint.PowerShell'
+
+    if ($null -ne (Get-Command -Name Connect-SPOService -ErrorAction SilentlyContinue) -and
+        $null -ne (Get-Command -Name Get-SPOSite -ErrorAction SilentlyContinue)) {
+        Write-Log -Message "SharePoint Online Management Shell commands are already available in this session."
+        return
+    }
+
+    $availableModule = Get-Module -ListAvailable -Name $moduleName | Sort-Object -Property Version -Descending | Select-Object -First 1
+    if ($null -eq $availableModule) {
+        $installHelp = @(
+            'The SharePoint Online Management Shell module was not found, so Connect-SPOService is unavailable.'
+            ''
+            'Install and load the module, then run this script again:'
+            ''
+            '    Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser -AllowClobber'
+            '    Import-Module Microsoft.Online.SharePoint.PowerShell'
+            '    Get-Command Connect-SPOService'
+            ''
+            'If your organization blocks PowerShell Gallery downloads, install the SharePoint Online Management Shell module using your approved software distribution method.'
+        ) -join [Environment]::NewLine
+        throw $installHelp
+    }
+
+    Write-Log -Message "Loading SharePoint Online Management Shell module '$($availableModule.Name)' version $($availableModule.Version) from '$($availableModule.ModuleBase)'."
+    Import-Module -Name $moduleName -ErrorAction Stop
+
+    if ($null -eq (Get-Command -Name Connect-SPOService -ErrorAction SilentlyContinue)) {
+        throw "Connect-SPOService is still unavailable after importing '$moduleName'. Verify that the module installation is valid and that you are running a supported PowerShell host."
+    }
+
+    if ($null -eq (Get-Command -Name Get-SPOSite -ErrorAction SilentlyContinue)) {
+        throw "Get-SPOSite is still unavailable after importing '$moduleName'. Verify that the module installation is valid and that you are running a supported PowerShell host."
     }
 }
 
@@ -324,13 +363,7 @@ if ($siteUrls.Count -eq 0) {
 
 Write-Log -Message "Number of SiteUrls provided: $($siteUrls.Count)"
 
-if ($null -eq (Get-Command -Name Connect-SPOService -ErrorAction SilentlyContinue)) {
-    throw 'Connect-SPOService was not found. Install or load the Microsoft.Online.SharePoint.PowerShell module, then run this script again.'
-}
-
-if ($null -eq (Get-Command -Name Get-SPOSite -ErrorAction SilentlyContinue)) {
-    throw 'Get-SPOSite was not found. Install or load the Microsoft.Online.SharePoint.PowerShell module, then run this script again.'
-}
+Initialize-SPOManagementShellModule
 
 Write-Log -Message 'Connecting to SharePoint Online Admin Center. Complete the interactive sign-in prompt if the module requires it.'
 Connect-SPOService -Url $TenantAdminUrl
