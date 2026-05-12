@@ -519,8 +519,9 @@ for ($index = 0; $index -lt $totalSites; $index++) {
     $siteNumber = $index + 1
     $percentComplete = [int](($siteNumber / $totalSites) * 100)
 
-    Write-Progress -Activity 'Analyzing SharePoint Online / OneDrive recycle bins' -Status "Processing $siteNumber of $totalSites: $currentSiteUrl" -PercentComplete $percentComplete
-    Write-Log -Message "Processing site $siteNumber of $totalSites: $currentSiteUrl"
+    $progressStatus = 'Processing {0} of {1}: {2}' -f $siteNumber, $totalSites, $currentSiteUrl
+    Write-Progress -Activity 'Analyzing SharePoint Online / OneDrive recycle bins' -Status $progressStatus -PercentComplete $percentComplete
+    Write-Log -Message $progressStatus
 
     try {
         $siteRows = @(Get-RecycleBinItemsForSite -CurrentSiteUrl $currentSiteUrl)
