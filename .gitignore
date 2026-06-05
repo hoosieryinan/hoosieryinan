@@ -1,0 +1,24 @@
+# PowerShell runtime output
+*.log
+*_log.txt
+*PermissionChanges*.csv
+*PermissionSkipped*.csv
+*PermissionSnapshot*.json
+*PermissionSummary*.txt
+
+# Script output folders
+**/output/*
+!**/output/.gitkeep
+
+# Secrets / local config
+*.secret.*
+*.local.*
+.env
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
